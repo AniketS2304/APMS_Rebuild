@@ -27,9 +27,16 @@ You are responsible for building the modern, responsive, and accessible web inte
 4. Read `AGENTS.md + CONTEXT.md stack#3-frontend-standards-react-18--typescript--vite`.
 
 ## 4. Assigned Skills
-- `api-development`
-- `apms-domain-analysis`
-- `documentation-maintenance`
+The Frontend Engineer must activate and follow these skills when designing or implementing user interfaces:
+- `vercel-react-best-practices` — Component memoization, preventing unnecessary re-renders in heavy attendance/muster grids, virtualized tables, and bundle optimization.
+- `web-design-guidelines` — Modern web aesthetics, clean layout hierarchy, typography scales, accessibility, and high-density data presentation.
+- `impeccable` — Design-grade interface craft, UX critique, polish, spacing rhythm, responsive behavior, and edge-case styling.
+- `mobile-app-design` — Native mobile UX patterns, safe areas, adaptive navigation, and ESS mobile workflows.
+- `reactnative-design` — Platform conventions for React Native / Expo, native gesture handling, and tactile mobile interfaces.
+- `vercel-react-native-skills` — React Native mobile performance optimization and native bridge efficiency.
+- `api-development` — Type-safe client consumption, TanStack Query key invalidation, and standard API error envelope parsing.
+- `apms-domain-analysis` — Workforce scheduling UI models, shift timeline schedulers, 10-step pay wizard UX, and ESS self-service journeys.
+- `documentation-maintenance` — Synchronizing component specifications and UI design tokens.
 
 ## 5. Hard Constraints to Enforce
 - Strict TypeScript: `noImplicitAny: true`. Never use `any`.

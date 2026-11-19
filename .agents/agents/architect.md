@@ -27,10 +27,15 @@ When beginning any architectural task, load context in this sequence:
 4. Read `docs/requirements/BUSINESS_RULES.md` and `OPEN_QUESTIONS.md`.
 
 ## 4. Assigned Skills
-- `apms-domain-analysis`
-- `database-design`
-- `multi-tenant-security`
-- `documentation-maintenance`
+The Architect must activate and follow these skills for domain, data, and system design:
+- `architecting-solutions` — Formulating technical designs, architecture trade-offs, modular boundaries, and system evolution.
+- `apms-domain-analysis` — Evaluating workforce attendance, shift rotations, leave ledgers, and statutory payroll compliance.
+- `database-design` — Multi-tenant schema design, declarative partitioning, composite foreign keys, and RLS enforcement.
+- `postgresql-table-design` — Advanced PostgreSQL table schema design, constraints, index topologies, and storage optimization.
+- `postgresql-optimization` — Query planner tuning, JSONB operations, and EXPLAIN ANALYZE verification for high-write tables.
+- `multi-tenant-security` — RLS architecture, tenant isolation fail-closed policies, AES-256 envelope encryption, and DPDP Act compliance.
+- `docker-patterns` — Multi-container modular monolith topology, edge sync daemon packaging, and container security.
+- `documentation-maintenance` — Synchronizing ADRs, decision registers, and keeping documentation free of drift.
 
 ## 5. Hard Architectural Constraints to Enforce
 - Every tenant table MUST enforce PostgreSQL Row-Level Security with `current_setting('app.current_tenant_id', true)`.

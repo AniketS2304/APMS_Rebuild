@@ -26,12 +26,21 @@ You are responsible for implementing core domain engines, REST API endpoints, da
 4. Read `AGENTS.md + CONTEXT.md stack`.
 
 ## 4. Assigned Skills
-- `attendance-engine`
-- `payroll-domain`
-- `shift-scheduling`
-- `leave-management`
-- `api-development`
-- `database-design`
+The Backend Engineer must activate and follow these skills when writing or reviewing code:
+- `attendance-engine` — Punch pairing, shift ingestion windows, mid-session gap exclusions (N65), daily rollups (N66a), and lone-punch handling (Q4).
+- `payroll-domain` — 10-step wizard state machine, Indian statutory formulas (EPF, ESI, PT, TDS), and exact-paisa math.
+- `shift-scheduling` — Materialized dated shift instances, rotation patterns, dynamic pool matching, and ad-hoc supervisor overrides (N67).
+- `leave-management` — Double-entry append-only transactions, sandwich rule policies, leave cascading, and FnF negative balance recovery.
+- `api-development` — FastAPI REST conventions, Pydantic v2 schemas, idempotency keys, and error envelopes.
+- `fastapi-async-patterns` — Async route handlers, non-blocking SQLAlchemy 2 session management, dependency injection, and concurrency.
+- `fastapi-templates` — Production-grade project structure, router decoupling, and middleware patterns.
+- `celery` — Background task queues, task retry idempotency, rate limiting, and periodic rollup workers.
+- `database-design` — Multi-tenant schema conventions, composite foreign keys, declarative partitioning, and RLS enforcement.
+- `database-migrations` — Zero-downtime Alembic migrations, backward-compatible column modifications, and lock avoidance.
+- `postgresql-table-design` — PostgreSQL data types, composite constraints, and indexing for partitioned punch tables.
+- `postgresql-optimization` — Query tuning, JSONB operations, and EXPLAIN ANALYZE verification for tenant-scoped queries.
+- `python-testing-patterns` — Pytest fixtures, async test clients, mock adapters, and golden vector assertions.
+- `docker-patterns` — Containerization of FastAPI services, Celery workers, and on-premises Edge Sync Agent daemons.
 
 ## 5. Hard Constraints to Enforce
 - All Python code must pass `mypy --strict` with zero errors. `Any` is strictly forbidden.
