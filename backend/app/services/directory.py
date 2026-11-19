@@ -7,8 +7,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import ProblemError
 from app.models.branch import Branch
+from app.models.department import Department
 from app.models.iam import Permission, Role, RolePermission, User, UserRole
-from app.schemas.iam import BranchCreate, BranchOut, BranchUpdate, RoleCreate, RoleOut, RoleUpdate, UserOut
+from app.schemas.iam import (
+    BranchCreate,
+    BranchOut,
+    BranchUpdate,
+    DepartmentCreate,
+    DepartmentOut,
+    DepartmentUpdate,
+    RoleCreate,
+    RoleOut,
+    RoleUpdate,
+    UserOut,
+)
 from app.services.access import require_codes, role_codes_for_user
 
 
@@ -181,3 +193,89 @@ async def delete_branch(session: AsyncSession, tenant_id: UUID, branch_id: UUID)
     if branch is None or branch.tenant_id != tenant_id:
         raise ProblemError(404, "Branch not found", "No branch with that id exists in this tenant.")
     await session.delete(branch)
+
+
+def department_out(department: Department) -> DepartmentOut:
+    return DepartmentOut(
+        id=department.id,
+        branch_id=department.branch_id,
+        name=department.name,
+        code=department.code,
+        is_active=department.is_active,
+    )
+
+
+async def list_departments(
+    session: AsyncSession,
+    tenant_id: UUID,
+    branch_id: UUID | None = None,
+) -> list[DepartmentOut]:
+    stmt = select(Department).where(Department.tenant_id == tenant_id)
+    if branch_id is not None:
+        stmt = stmt.where(Department.branch_id == branch_id)
+    stmt = stmt.order_by(Department.code)
+    rows = (await session.scalars(stmt)).all()
+    return [department_out(row) for row in rows]
+
+
+async def create_department(
+    session: AsyncSession,
+    tenant_id: UUID,
+    payload: DepartmentCreate,
+) -> DepartmentOut:
+    branch = await session.get(Branch, payload.branch_id)
+    if branch is None or branch.tenant_id != tenant_id:
+        raise ProblemError(404, "Branch not found", "No branch with that id exists in this tenant.")
+    department = Department(
+        id=uuid4(),
+        tenant_id=tenant_id,
+        branch_id=payload.branch_id,
+        name=payload.name,
+        code=payload.code,
+        is_active=True,
+        created_at=datetime.now(UTC),
+    )
+    session.add(department)
+    try:
+        await session.flush()
+    except IntegrityError as exc:
+        raise ProblemError(
+            409, "Department already exists", "A department with this code already exists in this branch."
+        ) from exc
+    return department_out(department)
+
+
+async def update_department(
+    session: AsyncSession,
+    tenant_id: UUID,
+    department_id: UUID,
+    payload: DepartmentUpdate,
+) -> DepartmentOut:
+    department = await session.get(Department, department_id)
+    if department is None or department.tenant_id != tenant_id:
+        raise ProblemError(404, "Department not found", "No department with that id exists in this tenant.")
+    if payload.branch_id is not None:
+        branch = await session.get(Branch, payload.branch_id)
+        if branch is None or branch.tenant_id != tenant_id:
+            raise ProblemError(404, "Branch not found", "No branch with that id exists in this tenant.")
+        department.branch_id = payload.branch_id
+    if payload.name is not None:
+        department.name = payload.name
+    if payload.code is not None:
+        department.code = payload.code
+    if payload.is_active is not None:
+        department.is_active = payload.is_active
+    try:
+        await session.flush()
+    except IntegrityError as exc:
+        raise ProblemError(
+            409, "Department already exists", "A department with this code already exists in this branch."
+        ) from exc
+    return department_out(department)
+
+
+async def delete_department(session: AsyncSession, tenant_id: UUID, department_id: UUID) -> None:
+    department = await session.get(Department, department_id)
+    if department is None or department.tenant_id != tenant_id:
+        raise ProblemError(404, "Department not found", "No department with that id exists in this tenant.")
+    await session.delete(department)

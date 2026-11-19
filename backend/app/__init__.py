@@ -1,3 +1,2 @@
-from app.main import app
+"""APMS application package."""
 
-__all__ = ["app"]
