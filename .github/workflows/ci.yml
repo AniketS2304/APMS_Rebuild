@@ -2,12 +2,9 @@ name: CI
 
 on:
   push:
-    branches:
-      - main
-      - '**'
+    branches: [main]
   pull_request:
-    branches:
-      - main
+    branches: [main]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -70,7 +67,6 @@ jobs:
           DATABASE_URL_MIGRATE: postgresql+asyncpg://apms:apms@localhost:5432/apms
           DATABASE_URL: postgresql+asyncpg://apms_app:apms_app@localhost:5432/apms
           JWT_SECRET: ci-dev-jwt-secret-minimum-32-bytes-long!
-          PII_ENCRYPTION_KEY: ci-dev-secret-pii-encryption-key-32b!
         run: |
           cd backend
           pytest -v
