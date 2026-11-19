@@ -90,6 +90,13 @@ async def test_department_negative_rls(seeded_tenants: tuple[Tenant, Tenant]) ->
             await delete_department(session_b, tenant_b.id, dept_a.id)
         assert exc_delete.value.status == 404
 
+    # Step 3: Re-read Tenant A row as Tenant A to confirm isolation and immutability
+    async with SessionLocal() as session_a:
+        await set_tenant(session_a, tenant_a.id)
+        row = await session_a.get(Department, dept_a.id)
+        assert row is not None
+        assert row.name == "Tenant A Secret Dept"
+
 
 @pytest.mark.asyncio
 async def test_department_composite_foreign_key_cross_tenant_branch_rejected(
@@ -237,3 +244,226 @@ async def test_department_api_crud_and_idempotency() -> None:
         )
         assert delete_resp.status_code == 200
         assert delete_resp.json()["id"] == dept_id
+
+
+@pytest.mark.asyncio
+async def test_delete_department_with_children_rejected_409(seeded_tenants: tuple[Tenant, Tenant]) -> None:
+    """Verify that deleting a parent department with sub-departments raises 409."""
+    tenant_a, _ = seeded_tenants
+    async with SessionLocal() as session:
+        await set_tenant(session, tenant_a.id)
+        branch = await session.scalar(select(Branch).where(Branch.tenant_id == tenant_a.id))
+        assert branch
+
+        parent = await create_department(
+            session,
+            tenant_a.id,
+            DepartmentCreate(
+                branch_id=branch.id,
+                name="Parent Division Ops",
+                code=f"POP-{uuid4().hex[:4].upper()}",
+            ),
+        )
+        await create_department(
+            session,
+            tenant_a.id,
+            DepartmentCreate(
+                branch_id=branch.id,
+                name="Child Unit Ops",
+                code=f"COP-{uuid4().hex[:4].upper()}",
+                parent_dept_id=parent.id,
+            ),
+        )
+        await session.commit()
+
+    async with SessionLocal() as session:
+        await set_tenant(session, tenant_a.id)
+        with pytest.raises(ProblemError) as exc_info:
+            await delete_department(session, tenant_a.id, parent.id)
+        assert exc_info.value.status == 409
+        assert "sub-departments" in exc_info.value.title.lower() or "sub-departments" in exc_info.value.detail.lower()
+
+
+@pytest.mark.asyncio
+async def test_department_two_node_cycle_rejected_400(seeded_tenants: tuple[Tenant, Tenant]) -> None:
+    """Verify that creating a two-node cycle in the department hierarchy raises 400."""
+    tenant_a, _ = seeded_tenants
+    async with SessionLocal() as session:
+        await set_tenant(session, tenant_a.id)
+        branch = await session.scalar(select(Branch).where(Branch.tenant_id == tenant_a.id))
+        assert branch
+
+        dept_1 = await create_department(
+            session,
+            tenant_a.id,
+            DepartmentCreate(
+                branch_id=branch.id,
+                name="Cycle Dept 1",
+                code=f"CY1-{uuid4().hex[:4].upper()}",
+            ),
+        )
+        dept_2 = await create_department(
+            session,
+            tenant_a.id,
+            DepartmentCreate(
+                branch_id=branch.id,
+                name="Cycle Dept 2",
+                code=f"CY2-{uuid4().hex[:4].upper()}",
+                parent_dept_id=dept_1.id,
+            ),
+        )
+        await session.commit()
+
+    async with SessionLocal() as session:
+        await set_tenant(session, tenant_a.id)
+        # Attempt to set dept_2 as parent of dept_1 (creates 2-node cycle: dept_1 -> dept_2 -> dept_1)
+        with pytest.raises(ProblemError) as exc_info:
+            await update_department(
+                session,
+                tenant_a.id,
+                dept_1.id,
+                DepartmentUpdate(parent_dept_id=dept_2.id),
+            )
+        assert exc_info.value.status == 400
+        assert "cyclic" in exc_info.value.title.lower() or "descendant" in exc_info.value.detail.lower()
+
+
+@pytest.mark.asyncio
+async def test_department_parent_in_other_branch_rejected_400(seeded_tenants: tuple[Tenant, Tenant]) -> None:
+    """Verify that referencing a parent department in a different branch is rejected with 400."""
+    tenant_a, _ = seeded_tenants
+    async with SessionLocal() as session:
+        await set_tenant(session, tenant_a.id)
+        b1 = await session.scalar(select(Branch).where(Branch.tenant_id == tenant_a.id))
+        assert b1
+        from app.schemas.iam import BranchCreate
+        from app.services.directory import create_branch
+
+        b2 = await create_branch(
+            session,
+            tenant_a.id,
+            BranchCreate(
+                name="South Gate Branch",
+                code=f"SG-{uuid4().hex[:4].upper()}",
+            ),
+        )
+
+        dept_b1 = await create_department(
+            session,
+            tenant_a.id,
+            DepartmentCreate(
+                branch_id=b1.id,
+                name="Branch 1 Dept",
+                code=f"B1-{uuid4().hex[:4].upper()}",
+            ),
+        )
+
+        # 1. Reject create_department if parent is in a different branch
+        with pytest.raises(ProblemError) as exc_create:
+            await create_department(
+                session,
+                tenant_a.id,
+                DepartmentCreate(
+                    branch_id=b2.id,
+                    name="Branch 2 Dept",
+                    code=f"B2-{uuid4().hex[:4].upper()}",
+                    parent_dept_id=dept_b1.id,
+                ),
+            )
+        assert exc_create.value.status == 400
+
+        # Create department in branch 2 without parent
+        dept_b2 = await create_department(
+            session,
+            tenant_a.id,
+            DepartmentCreate(
+                branch_id=b2.id,
+                name="Branch 2 Dept B",
+                code=f"B2B-{uuid4().hex[:4].upper()}",
+            ),
+        )
+
+        # 2. Reject update_department linking to parent in different branch
+        with pytest.raises(ProblemError) as exc_update:
+            await update_department(
+                session,
+                tenant_a.id,
+                dept_b2.id,
+                DepartmentUpdate(parent_dept_id=dept_b1.id),
+            )
+        assert exc_update.value.status == 400
+
+
+@pytest.mark.asyncio
+async def test_supervisor_cannot_create_or_delete_department_403() -> None:
+    """Verify that supervisor@northmill.example gets 403 on POST and DELETE /departments."""
+    transport = ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        # 1. Login as supervisor
+        login_resp = await client.post(
+            "/api/v1/auth/login",
+            json={"email": "supervisor@northmill.example", "password": "ChangeMe-Supervisor-1"},
+        )
+        assert login_resp.status_code == 200
+        token = login_resp.json()["access_token"]
+        headers = {"Authorization": f"Bearer {token}"}
+
+        # 2. Attempt to create department -> 403 Forbidden
+        create_resp = await client.post(
+            "/api/v1/departments",
+            headers={**headers, "Idempotency-Key": str(uuid4())},
+            json={
+                "branch_id": str(uuid4()),
+                "name": "Unauthorized Dept",
+                "code": "UNAUTH",
+            },
+        )
+        assert create_resp.status_code == 403
+
+        # 3. Attempt to delete department -> 403 Forbidden
+        delete_resp = await client.delete(
+            f"/api/v1/departments/{uuid4()}",
+            headers=headers,
+        )
+        assert delete_resp.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_clear_parent_department(seeded_tenants: tuple[Tenant, Tenant]) -> None:
+    """Verify clearing parent_dept_id by passing null in update."""
+    tenant_a, _ = seeded_tenants
+    async with SessionLocal() as session:
+        await set_tenant(session, tenant_a.id)
+        branch = await session.scalar(select(Branch).where(Branch.tenant_id == tenant_a.id))
+        assert branch
+
+        parent = await create_department(
+            session,
+            tenant_a.id,
+            DepartmentCreate(
+                branch_id=branch.id,
+                name="Clear Parent Root",
+                code=f"CPR-{uuid4().hex[:4].upper()}",
+            ),
+        )
+        child = await create_department(
+            session,
+            tenant_a.id,
+            DepartmentCreate(
+                branch_id=branch.id,
+                name="Clear Parent Leaf",
+                code=f"CPL-{uuid4().hex[:4].upper()}",
+                parent_dept_id=parent.id,
+            ),
+        )
+        assert child.parent_dept_id == parent.id
+
+        # Update with parent_dept_id=None (explicit clearing via JSON null)
+        cleared = await update_department(
+            session,
+            tenant_a.id,
+            child.id,
+            DepartmentUpdate(parent_dept_id=None),
+        )
+        assert cleared.parent_dept_id is None
+

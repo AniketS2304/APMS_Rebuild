@@ -156,18 +156,12 @@ STATEMENTS = [
     CREATE POLICY tenant_isolation_tenants ON tenants
     FOR ALL
     USING (
-      id = CASE
-        WHEN current_setting('app.current_tenant_id', true) ~ '^[0-9a-fA-F-]{36}$'
-        THEN current_setting('app.current_tenant_id', true)::uuid
-        ELSE NULL
-      END
+      current_setting('app.current_tenant_id', true) ~ '^[0-9a-fA-F-]{36}$'
+      AND id = current_setting('app.current_tenant_id', true)::uuid
     )
     WITH CHECK (
-      id = CASE
-        WHEN current_setting('app.current_tenant_id', true) ~ '^[0-9a-fA-F-]{36}$'
-        THEN current_setting('app.current_tenant_id', true)::uuid
-        ELSE NULL
-      END
+      current_setting('app.current_tenant_id', true) ~ '^[0-9a-fA-F-]{36}$'
+      AND id = current_setting('app.current_tenant_id', true)::uuid
     )
     """,
 ]
@@ -178,18 +172,12 @@ def _policy(table: str) -> str:
     CREATE POLICY tenant_isolation_{table} ON {table}
     FOR ALL
     USING (
-      tenant_id = CASE
-        WHEN current_setting('app.current_tenant_id', true) ~ '^[0-9a-fA-F-]{{36}}$'
-        THEN current_setting('app.current_tenant_id', true)::uuid
-        ELSE NULL
-      END
+      current_setting('app.current_tenant_id', true) ~ '^[0-9a-fA-F-]{{36}}$'
+      AND tenant_id = current_setting('app.current_tenant_id', true)::uuid
     )
     WITH CHECK (
-      tenant_id = CASE
-        WHEN current_setting('app.current_tenant_id', true) ~ '^[0-9a-fA-F-]{{36}}$'
-        THEN current_setting('app.current_tenant_id', true)::uuid
-        ELSE NULL
-      END
+      current_setting('app.current_tenant_id', true) ~ '^[0-9a-fA-F-]{{36}}$'
+      AND tenant_id = current_setting('app.current_tenant_id', true)::uuid
     )
     """
 

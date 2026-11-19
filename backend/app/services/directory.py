@@ -231,6 +231,8 @@ async def create_department(
         parent = await session.get(Department, payload.parent_dept_id)
         if parent is None or parent.tenant_id != tenant_id:
             raise ProblemError(400, "Invalid parent department", "Parent department does not exist in this tenant.")
+        if parent.branch_id != payload.branch_id:
+            raise ProblemError(400, "Invalid parent department", "Parent department must belong to the same branch.")
     department = Department(
         id=uuid4(),
         tenant_id=tenant_id,
@@ -260,18 +262,34 @@ async def update_department(
     department = await session.get(Department, department_id)
     if department is None or department.tenant_id != tenant_id:
         raise ProblemError(404, "Department not found", "No department with that id exists in this tenant.")
+    target_branch_id = payload.branch_id if payload.branch_id is not None else department.branch_id
     if payload.branch_id is not None:
         branch = await session.get(Branch, payload.branch_id)
         if branch is None or branch.tenant_id != tenant_id:
             raise ProblemError(400, "Invalid branch", "Branch does not exist in this tenant.")
         department.branch_id = payload.branch_id
-    if payload.parent_dept_id is not None:
-        if payload.parent_dept_id == department_id:
-            raise ProblemError(400, "Invalid parent department", "Department cannot be its own parent.")
-        parent = await session.get(Department, payload.parent_dept_id)
+    if "parent_dept_id" in payload.model_fields_set:
+        chosen_parent_id = payload.parent_dept_id
+    else:
+        chosen_parent_id = department.parent_dept_id
+    if "parent_dept_id" in payload.model_fields_set and payload.parent_dept_id is None:
+        department.parent_dept_id = None
+    elif chosen_parent_id is not None:
+        parent = await session.get(Department, chosen_parent_id)
         if parent is None or parent.tenant_id != tenant_id:
             raise ProblemError(400, "Invalid parent department", "Parent department does not exist in this tenant.")
-        department.parent_dept_id = payload.parent_dept_id
+        if parent.branch_id != target_branch_id:
+            raise ProblemError(400, "Invalid parent department", "Parent department must belong to the same branch.")
+        curr = parent
+        visited = set()
+        while curr is not None:
+            if curr.id == department_id:
+                raise ProblemError(400, "Cyclic department hierarchy", "A department cannot be a descendant of itself.")
+            if curr.parent_dept_id is None or curr.id in visited:
+                break
+            visited.add(curr.id)
+            curr = await session.get(Department, curr.parent_dept_id)
+        department.parent_dept_id = chosen_parent_id
     if payload.name is not None:
         department.name = payload.name
     if payload.code is not None:
@@ -291,4 +309,19 @@ async def delete_department(session: AsyncSession, tenant_id: UUID, department_i
     department = await session.get(Department, department_id)
     if department is None or department.tenant_id != tenant_id:
         raise ProblemError(404, "Department not found", "No department with that id exists in this tenant.")
-    await session.delete(department)
+    has_sub = await session.scalar(
+        select(Department.id)
+        .where(Department.tenant_id == tenant_id, Department.parent_dept_id == department_id)
+        .limit(1)
+    )
+    if has_sub is not None:
+        raise ProblemError(
+            409, "Department has sub-departments", "Cannot delete a department that has sub-departments."
+        )
+    try:
+        await session.delete(department)
+        await session.flush()
+    except IntegrityError as exc:
+        raise ProblemError(
+            409, "Department has sub-departments", "Cannot delete a department that has sub-departments."
+        ) from exc

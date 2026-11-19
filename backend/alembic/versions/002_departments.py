@@ -73,7 +73,13 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.execute("DROP TABLE IF EXISTS departments CASCADE")
     codes = ", ".join(f"'{p[0]}'" for p in PERMISSIONS)
+    op.execute(
+        f"""
+        DELETE FROM role_permissions
+        WHERE permission_id IN (SELECT id FROM permissions WHERE code IN ({codes}))
+        """
+    )
     op.execute(f"DELETE FROM permissions WHERE code IN ({codes})")
+    op.execute("DROP TABLE IF EXISTS departments CASCADE")
 
