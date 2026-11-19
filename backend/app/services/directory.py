@@ -201,6 +201,7 @@ def department_out(department: Department) -> DepartmentOut:
         branch_id=department.branch_id,
         name=department.name,
         code=department.code,
+        parent_dept_id=department.parent_dept_id,
         is_active=department.is_active,
     )
 
@@ -225,13 +226,18 @@ async def create_department(
 ) -> DepartmentOut:
     branch = await session.get(Branch, payload.branch_id)
     if branch is None or branch.tenant_id != tenant_id:
-        raise ProblemError(404, "Branch not found", "No branch with that id exists in this tenant.")
+        raise ProblemError(400, "Invalid branch", "Branch does not exist in this tenant.")
+    if payload.parent_dept_id is not None:
+        parent = await session.get(Department, payload.parent_dept_id)
+        if parent is None or parent.tenant_id != tenant_id:
+            raise ProblemError(400, "Invalid parent department", "Parent department does not exist in this tenant.")
     department = Department(
         id=uuid4(),
         tenant_id=tenant_id,
         branch_id=payload.branch_id,
         name=payload.name,
         code=payload.code,
+        parent_dept_id=payload.parent_dept_id,
         is_active=True,
         created_at=datetime.now(UTC),
     )
@@ -257,8 +263,15 @@ async def update_department(
     if payload.branch_id is not None:
         branch = await session.get(Branch, payload.branch_id)
         if branch is None or branch.tenant_id != tenant_id:
-            raise ProblemError(404, "Branch not found", "No branch with that id exists in this tenant.")
+            raise ProblemError(400, "Invalid branch", "Branch does not exist in this tenant.")
         department.branch_id = payload.branch_id
+    if payload.parent_dept_id is not None:
+        if payload.parent_dept_id == department_id:
+            raise ProblemError(400, "Invalid parent department", "Department cannot be its own parent.")
+        parent = await session.get(Department, payload.parent_dept_id)
+        if parent is None or parent.tenant_id != tenant_id:
+            raise ProblemError(400, "Invalid parent department", "Parent department does not exist in this tenant.")
+        department.parent_dept_id = payload.parent_dept_id
     if payload.name is not None:
         department.name = payload.name
     if payload.code is not None:

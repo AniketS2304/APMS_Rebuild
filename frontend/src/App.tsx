@@ -212,6 +212,7 @@ function Departments({ me }: { me: Me }) {
   async function create(event: FormEvent) {
     event.preventDefault();
     if (!selectedBranchId) return;
+    setError("");
     try {
       await api.createDepartment(selectedBranchId, name, code.toUpperCase());
       setName("");

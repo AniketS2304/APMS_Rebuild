@@ -7,7 +7,14 @@ export type Me = {
   permissions: string[];
 };
 export type Branch = { id: string; name: string; code: string; is_active: boolean };
-export type Department = { id: string; branch_id: string; name: string; code: string; is_active: boolean };
+export type Department = {
+  id: string;
+  branch_id: string;
+  name: string;
+  code: string;
+  parent_dept_id?: string | null;
+  is_active: boolean;
+};
 export type Role = { id: string; code: string; name: string; is_system: boolean; permissions: string[] };
 export type Permission = { code: string; module: string; resource: string; action: string; description: string };
 export type DirectoryUser = { id: string; email: string; full_name: string; is_active: boolean; roles: string[] };

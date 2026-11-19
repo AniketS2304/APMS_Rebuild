@@ -24,10 +24,13 @@ def upgrade() -> None:
           branch_id uuid NOT NULL,
           name varchar(200) NOT NULL,
           code varchar(20) NOT NULL,
+          parent_dept_id uuid,
           is_active boolean NOT NULL DEFAULT true,
           created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
           CONSTRAINT fk_departments_branch FOREIGN KEY (tenant_id, branch_id)
             REFERENCES branches (tenant_id, id) ON DELETE CASCADE,
+          CONSTRAINT fk_departments_parent FOREIGN KEY (tenant_id, parent_dept_id)
+            REFERENCES departments (tenant_id, id),
           CONSTRAINT uq_departments_tenant_id UNIQUE (tenant_id, id),
           CONSTRAINT uq_departments_tenant_branch_code UNIQUE (tenant_id, branch_id, code)
         )
@@ -40,12 +43,18 @@ def upgrade() -> None:
         CREATE POLICY tenant_isolation_departments ON departments
         FOR ALL
         USING (
-          current_setting('app.current_tenant_id', true) ~ '^[0-9a-fA-F-]{36}$'
-          AND tenant_id = current_setting('app.current_tenant_id', true)::uuid
+          tenant_id = CASE
+            WHEN current_setting('app.current_tenant_id', true) ~ '^[0-9a-fA-F-]{36}$'
+            THEN current_setting('app.current_tenant_id', true)::uuid
+            ELSE NULL
+          END
         )
         WITH CHECK (
-          current_setting('app.current_tenant_id', true) ~ '^[0-9a-fA-F-]{36}$'
-          AND tenant_id = current_setting('app.current_tenant_id', true)::uuid
+          tenant_id = CASE
+            WHEN current_setting('app.current_tenant_id', true) ~ '^[0-9a-fA-F-]{36}$'
+            THEN current_setting('app.current_tenant_id', true)::uuid
+            ELSE NULL
+          END
         )
         """
     )
@@ -57,6 +66,7 @@ def upgrade() -> None:
         f"""
         INSERT INTO permissions (code, module, resource, action, description)
         VALUES {values}
+        ON CONFLICT (code) DO NOTHING
         """
     )
     op.execute("GRANT SELECT, INSERT, UPDATE, DELETE ON departments TO apms_app")
