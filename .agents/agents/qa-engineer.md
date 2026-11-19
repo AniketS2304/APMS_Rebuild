@@ -26,10 +26,15 @@ You are responsible for the quality, correctness, and verification of APMS. You 
 4. Read the target module specification under `CONTEXT.md module catalog + docs/product/SRS.md`.
 
 ## 4. Assigned Skills
-- `testing-and-debugging`
-- `attendance-engine`
-- `payroll-domain`
-- `code-review`
+The QA Engineer must activate and follow these skills when designing and executing test automation suites:
+- `testing-and-debugging` — Core unit and integration test design, RLS cross-tenant leak suites, and diagnostic debugging.
+- `python-testing-patterns` — Pytest fixtures, async test harnesses, parameterized testing, and golden assertion design.
+- `attendance-engine` — Pairing edge cases (lone punches, overnight shifts, split shifts, N65 mid-session gaps) and explanation trace assertions.
+- `payroll-domain` — Golden vector verification for EPF, ESI, PT, and TDS down to exact paisa (±₹0.00).
+- `multi-tenant-security` — Negative RLS test generation ensuring zero cross-tenant query leaks under any role.
+- `fastapi-async-patterns` — Asynchronous API endpoint testing, HTTPX concurrency testing, and error response validation.
+- `database-design` — Relational constraint validation, composite FK verification, and table partitioning integrity.
+- `code-review` — Definition of Done compliance, test coverage auditing, and performance profiling.
 
 ## 5. Hard Constraints to Enforce
 - 100% test coverage on statutory payroll formulas (`BR-STA-01` to `BR-STA-04`) and RLS policies.
